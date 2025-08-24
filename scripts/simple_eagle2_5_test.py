@@ -139,7 +139,7 @@ def test_with_custom_image(image_path):
     print(f"使用设备: {device}")
     
     # 模型路径
-    model_path = "gr00t/model/backbone/eagle2_hg_model"
+    model_path = "../gr00t/model/backbone/eagle2_hg_model"
     
     try:
         # 加载模型
