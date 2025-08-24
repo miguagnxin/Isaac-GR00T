@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-简化版 Eagle 2.5 模型测试脚本
+修复版 Eagle 2.5 模型测试脚本
 
-这个脚本用于测试Eagle 2.5模型在给定图片上生成文字描述的能力。
+这个脚本使用更直接的方法来测试Eagle 2.5模型，避免复杂的对话模板处理。
 """
 
 import os
@@ -10,14 +10,14 @@ import torch
 from PIL import Image
 from transformers import AutoConfig, AutoModel, AutoProcessor
 
-def test_eagle2_5_model():
-    """测试Eagle 2.5模型"""
+def test_eagle2_5_model_simple():
+    """使用简单方法测试Eagle 2.5模型"""
     
     # 设置设备
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"使用设备: {device}")
     
-    # 模型路径 - 使用GR00T项目中的Eagle模型
+    # 模型路径
     model_path = "gr00t/model/backbone/eagle2_hg_model"
     
     if not os.path.exists(model_path):
@@ -42,7 +42,7 @@ def test_eagle2_5_model():
         
         print("模型加载完成!")
         
-        # 测试图片路径 - 使用项目中的示例图片
+        # 测试图片路径
         test_image_path = "media/g1-pick-apple-images.png"
         
         if not os.path.exists(test_image_path):
@@ -52,42 +52,25 @@ def test_eagle2_5_model():
         
         print(f"测试图片: {test_image_path}")
         
-        # 加载和预处理图片
+        # 加载图片
         image = Image.open(test_image_path).convert('RGB')
         
-        # 构建正确的对话格式 - 使用文本占位符而不是直接传递图像对象
-        conversation = [
-            {
-                "role": "user", 
-                "content": [
-                    {"type": "image", "image": test_image_path},  # 使用图片路径而不是PIL对象
-                    {"type": "text", "text": "请详细描述这张图片的内容"}
-                ]
-            }
-        ]
+        # 方法1: 直接使用处理器处理图像和文本
+        print("\n方法1: 直接处理图像和文本")
         
-        # 应用聊天模板
-        text = processor.apply_chat_template(
-            conversation, 
-            tokenize=False, 
-            add_generation_prompt=True
+        # 处理图像
+        image_inputs = processor(
+            images=image,
+            return_tensors="pt"
         )
         
-        print(f"处理后的文本: {text[:200]}...")
-        
-        # 使用正确的处理器调用方式 - 分别处理文本和图像
-        # 处理文本输入
+        # 处理文本 - 使用简单的提示词
+        text = "请描述这张图片的内容"
         text_inputs = processor(
             text=text,
             return_tensors="pt",
             padding=True,
             truncation=True
-        )
-        
-        # 处理图像输入
-        image_inputs = processor(
-            images=image,  # 直接传递PIL图像
-            return_tensors="pt"
         )
         
         # 移动到设备
@@ -123,6 +106,7 @@ def test_eagle2_5_model():
         print("\n" + "="*50)
         print("生成结果:")
         print(f"原始图片: {test_image_path}")
+        print(f"提示词: {text}")
         print(f"生成的文字描述: {generated_text.strip()}")
         print("="*50)
         
@@ -131,19 +115,15 @@ def test_eagle2_5_model():
         import traceback
         traceback.print_exc()
 
-def test_with_custom_image(image_path):
-    """使用自定义图片测试模型"""
-    
-    if not os.path.exists(image_path):
-        print(f"错误: 图片文件不存在: {image_path}")
-        return
+def test_eagle2_5_model_with_conversation():
+    """使用对话格式测试Eagle 2.5模型"""
     
     # 设置设备
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"使用设备: {device}")
     
     # 模型路径
-    model_path = "../gr00t/model/backbone/eagle2_hg_model"
+    model_path = "gr00t/model/backbone/eagle2_hg_model"
     
     try:
         # 加载模型
@@ -153,27 +133,43 @@ def test_with_custom_image(image_path):
         model.to(device)
         model.eval()
         
-        # 加载图片
-        image = Image.open(image_path).convert('RGB')
+        print("模型加载完成!")
         
-        # 构建对话 - 使用正确的格式
+        # 测试图片路径
+        test_image_path = "media/g1-pick-apple-images.png"
+        
+        if not os.path.exists(test_image_path):
+            print(f"测试图片不存在: {test_image_path}")
+            return
+        
+        print(f"测试图片: {test_image_path}")
+        
+        # 加载图片
+        image = Image.open(test_image_path).convert('RGB')
+        
+        print("\n方法2: 使用对话格式")
+        
+        # 构建对话格式 - 使用图片路径而不是PIL对象
         conversation = [
             {
                 "role": "user", 
                 "content": [
-                    {"type": "image", "image": image_path},  # 使用图片路径
+                    {"type": "image", "image": test_image_path},
                     {"type": "text", "text": "请详细描述这张图片的内容"}
                 ]
             }
         ]
         
-        # 处理输入 - 分别处理文本和图像
+        # 应用聊天模板
         text = processor.apply_chat_template(
             conversation, 
             tokenize=False, 
             add_generation_prompt=True
         )
         
+        print(f"处理后的文本: {text[:200]}...")
+        
+        # 分别处理文本和图像
         text_inputs = processor(
             text=text,
             return_tensors="pt",
@@ -186,17 +182,22 @@ def test_with_custom_image(image_path):
             return_tensors="pt"
         )
         
+        # 移动到设备
         input_ids = text_inputs.input_ids.to(device)
         attention_mask = text_inputs.attention_mask.to(device)
         pixel_values = image_inputs.pixel_values.to(device)
         
-        # 生成
+        print(f"输入形状: input_ids={input_ids.shape}, pixel_values={pixel_values.shape}")
+        
+        # 生成文本
+        print("开始生成文字描述...")
+        
         with torch.no_grad():
             outputs = model.generate(
                 pixel_values=pixel_values,
                 input_ids=input_ids,
                 attention_mask=attention_mask,
-                max_new_tokens=150,
+                max_new_tokens=100,
                 do_sample=True,
                 temperature=0.7,
                 top_p=0.9,
@@ -205,30 +206,31 @@ def test_with_custom_image(image_path):
                 eos_token_id=processor.tokenizer.eos_token_id,
             )
         
-        # 解码结果
+        # 解码生成的文本
         generated_text = processor.tokenizer.decode(
             outputs[0][input_ids.shape[1]:], 
             skip_special_tokens=True
         )
         
-        print(f"\n图片: {image_path}")
-        print(f"描述: {generated_text.strip()}")
+        print("\n" + "="*50)
+        print("对话格式生成结果:")
+        print(f"原始图片: {test_image_path}")
+        print(f"生成的文字描述: {generated_text.strip()}")
+        print("="*50)
         
     except Exception as e:
-        print(f"测试失败: {e}")
+        print(f"对话格式测试失败: {e}")
         import traceback
         traceback.print_exc()
 
 if __name__ == "__main__":
-    print("Eagle 2.5 模型测试脚本")
+    print("修复版 Eagle 2.5 模型测试脚本")
     print("="*50)
     
-    # 测试默认图片
-    test_eagle2_5_model()
+    # 测试方法1: 直接处理
+    test_eagle2_5_model_simple()
     
-    # 如果有命令行参数，测试指定的图片
-    import sys
-    if len(sys.argv) > 1:
-        custom_image = sys.argv[1]
-        print(f"\n测试自定义图片: {custom_image}")
-        test_with_custom_image(custom_image)
+    print("\n" + "="*50)
+    
+    # 测试方法2: 对话格式
+    test_eagle2_5_model_with_conversation()
