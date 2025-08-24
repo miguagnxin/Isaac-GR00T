@@ -18,7 +18,7 @@ def test_eagle2_5_model():
     print(f"使用设备: {device}")
     
     # 模型路径 - 使用GR00T项目中的Eagle模型
-    model_path = "gr00t/model/backbone/eagle2_hg_model"
+    model_path = "../gr00t/model/backbone/eagle2_hg_model"
     
     if not os.path.exists(model_path):
         print(f"错误: 模型路径不存在: {model_path}")
@@ -77,19 +77,14 @@ def test_eagle2_5_model():
         
         # 使用正确的处理器调用方式 - 分别处理文本和图像
         # 处理文本输入
-        text_inputs = processor(
+        inputs = processor(
             text=text,
+            images=image,
             return_tensors="pt",
             padding=True,
             truncation=True
         )
-        
-        # 处理图像输入
-        image_inputs = processor(
-            images=image,  # 直接传递PIL图像
-            return_tensors="pt"
-        )
-        
+
         # 移动到设备
         input_ids = text_inputs.input_ids.to(device)
         attention_mask = text_inputs.attention_mask.to(device)
